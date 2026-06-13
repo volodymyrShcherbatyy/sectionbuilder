@@ -1,0 +1,3 @@
+export const EDITOR_CANVAS_MIN_WIDTH_PX = 860;
+export const EDITOR_CANVAS_MIN_HEIGHT_PX = 600;
+export const EDITOR_CANVAS_PADDING_PX = 40;
