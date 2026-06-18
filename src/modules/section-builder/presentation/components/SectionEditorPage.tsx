@@ -3,11 +3,17 @@
 import { useMemo, useState } from "react";
 import { EditorCanvas } from "./EditorCanvas";
 import { ExportCodeModal } from "./ExportCodeModal";
+import { ExportJsonModal } from "./ExportJsonModal";
+import { ImportJsonModal } from "./ImportJsonModal";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
+import { LocalStorageSync } from "./LocalStorageSync";
 import { PropertiesPanel } from "./PropertiesPanel";
 import { useSectionEditorStore } from "../state/sectionEditorStore";
 import type { SectionElementType } from "../../core/entities/Section";
 import { exportSectionToHtml } from "../../infrastructure/codegen/exportSectionToHtml";
+import { exportSectionToJson } from "../../infrastructure/codegen/exportSectionToJson";
+import { importSectionFromJson } from "../../infrastructure/codegen/importSectionFromJson";
+import { createSectionJsonFileName } from "../../infrastructure/codegen/createSectionJsonFileName";
 
 const elementButtons: Array<{
   label: string;
@@ -22,24 +28,64 @@ const elementButtons: Array<{
 
 export function SectionEditorPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isExportJsonModalOpen, setIsExportJsonModalOpen] = useState(false);
+  const [isImportJsonModalOpen, setIsImportJsonModalOpen] = useState(false);
 
   const section = useSectionEditorStore((state) => state.section);
   const addElement = useSectionEditorStore((state) => state.addElement);
-
   const resetSection = useSectionEditorStore((state) => state.resetSection);
+  const replaceSection = useSectionEditorStore((state) => state.replaceSection);
 
   const exportedCode = useMemo(() => {
     return exportSectionToHtml(section);
   }, [section]);
 
+  const exportedJson = useMemo(() => {
+    return exportSectionToJson(section);
+  }, [section]);
+
+  const exportedJsonFileName = useMemo(() => {
+    return createSectionJsonFileName(section.name);
+  }, [section.name]);
+
+  function handleImportJson(jsonValue: string) {
+    const importedSection = importSectionFromJson(jsonValue);
+
+    if (!importedSection) {
+      return;
+    }
+
+    replaceSection(importedSection);
+    setIsImportJsonModalOpen(false);
+  }
+
   return (
     <div className="flex h-screen flex-col bg-slate-50">
-      {!isExportModalOpen && <KeyboardShortcuts />}
+      <LocalStorageSync />
+
+      {!isExportModalOpen && !isExportJsonModalOpen && !isImportJsonModalOpen && (
+        <KeyboardShortcuts />
+      )}
 
       {isExportModalOpen && (
         <ExportCodeModal
           code={exportedCode}
           onClose={() => setIsExportModalOpen(false)}
+        />
+      )}
+
+      {isExportJsonModalOpen && (
+        <ExportJsonModal
+          fileName={exportedJsonFileName}
+          json={exportedJson}
+          onClose={() => setIsExportJsonModalOpen(false)}
+        />
+      )}
+
+      {isImportJsonModalOpen && (
+        <ImportJsonModal
+          onClose={() => setIsImportJsonModalOpen(false)}
+          onImport={handleImportJson}
         />
       )}
 
@@ -49,7 +95,7 @@ export function SectionEditorPage() {
             sectionbuilder
           </div>
           <div className="text-xs text-slate-500">
-            WYSIWYG Tailwind section editor
+            Current section: {section.name || "Untitled section"}
           </div>
         </div>
 
@@ -60,6 +106,22 @@ export function SectionEditorPage() {
             className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
           >
             Reset Section
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsImportJsonModalOpen(true)}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            Import JSON
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsExportJsonModalOpen(true)}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            Export JSON
           </button>
 
           <button

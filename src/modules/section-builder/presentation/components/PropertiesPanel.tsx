@@ -10,6 +10,9 @@ export function PropertiesPanel() {
   const updateSectionSize = useSectionEditorStore(
     (state) => state.updateSectionSize
   );
+  const updateSectionName = useSectionEditorStore(
+    (state) => state.updateSectionName
+  );
   const updateSectionBackground = useSectionEditorStore(
     (state) => state.updateSectionBackground
   );
@@ -19,6 +22,23 @@ export function PropertiesPanel() {
   const updateElement = useSectionEditorStore((state) => state.updateElement);
 
   const deleteElement = useSectionEditorStore((state) => state.deleteElement);
+
+  const duplicateElement = useSectionEditorStore(
+    (state) => state.duplicateElement
+  );
+
+  const bringSelectedElementForward = useSectionEditorStore(
+    (state) => state.bringSelectedElementForward
+  );
+  const sendSelectedElementBackward = useSectionEditorStore(
+    (state) => state.sendSelectedElementBackward
+  );
+  const bringSelectedElementToFront = useSectionEditorStore(
+    (state) => state.bringSelectedElementToFront
+  );
+  const sendSelectedElementToBack = useSectionEditorStore(
+    (state) => state.sendSelectedElementToBack
+  );
 
   const selectedElement = section.elements.find(
     (element) => element.id === selectedId
@@ -43,13 +63,63 @@ export function PropertiesPanel() {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => deleteElement(selectedElement.id)}
-          className="mt-4 w-full rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-        >
-          Delete Element
-        </button>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => duplicateElement(selectedElement.id)}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Duplicate
+          </button>
+
+          <button
+            type="button"
+            onClick={() => deleteElement(selectedElement.id)}
+            className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+          >
+            Delete
+          </button>
+        </div>
+
+        <div className="mt-3 rounded-lg border border-slate-200 p-3">
+          <div className="text-xs font-semibold uppercase text-slate-500">
+            Order
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={sendSelectedElementToBack}
+              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Send to back
+            </button>
+
+            <button
+              type="button"
+              onClick={bringSelectedElementToFront}
+              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Bring to front
+            </button>
+
+            <button
+              type="button"
+              onClick={sendSelectedElementBackward}
+              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Backward
+            </button>
+
+            <button
+              type="button"
+              onClick={bringSelectedElementForward}
+              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Forward
+            </button>
+          </div>
+        </div>
 
         <div className="mt-4 space-y-4">
           {(selectedElement.type === "text" ||
@@ -232,6 +302,18 @@ export function PropertiesPanel() {
         </div>
 
         <div className="mt-1 text-sm text-slate-900">{section.name}</div>
+      </div>
+
+      <div className="mt-4">
+        <label className="text-xs font-medium text-slate-600">
+          Section name
+        </label>
+        <input
+          type="text"
+          value={section.name}
+          onChange={(event) => updateSectionName(event.target.value)}
+          className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+        />
       </div>
 
       <div className="mt-4 space-y-4">

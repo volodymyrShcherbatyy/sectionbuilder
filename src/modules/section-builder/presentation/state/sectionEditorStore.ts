@@ -32,8 +32,17 @@ type SectionEditorState = {
   addElement: (type: SectionElementType) => void;
   updateElement: (elementId: string, patch: UpdateElementPatch) => void;
   deleteElement: (elementId: string) => void;
+  duplicateElement: (elementId: string) => void;
+  moveSelectedElement: (deltaX: number, deltaY: number) => void;
+
+  bringSelectedElementForward: () => void;
+  sendSelectedElementBackward: () => void;
+  bringSelectedElementToFront: () => void;
+  sendSelectedElementToBack: () => void;
 
   resetSection: () => void;
+  replaceSection: (section: Section) => void;
+  updateSectionName: (name: string) => void;
   updateSectionSize: (width: number, height: number) => void;
   updateSectionBackground: (backgroundColor: string) => void;
   updateSectionBorderRadius: (borderRadius: number) => void;
@@ -144,6 +153,38 @@ function createEmptySection(): Section {
   };
 }
 
+function createDuplicatedElement(
+  element: SectionElement,
+  section: Section
+): SectionElement {
+  const nextX = Math.min(element.x + 10, Math.max(0, section.width - element.width));
+  const nextY = Math.min(
+    element.y + 10,
+    Math.max(0, section.height - element.height)
+  );
+
+  return {
+    ...element,
+    id: `element-${crypto.randomUUID()}`,
+    name: `${element.name} copy`,
+    x: nextX,
+    y: nextY,
+  };
+}
+
+function moveArrayItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
+  const nextItems = [...items];
+  const [item] = nextItems.splice(fromIndex, 1);
+
+  if (!item) {
+    return items;
+  }
+
+  nextItems.splice(toIndex, 0, item);
+
+  return nextItems;
+}
+
 export const useSectionEditorStore = create<SectionEditorState>((set) => ({
   section: createEmptySection(),
 
@@ -152,6 +193,22 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
       section: createEmptySection(),
       selectedId: "section-root",
     });
+  },
+
+  replaceSection: (section) => {
+    set({
+      section,
+      selectedId: section.id,
+    });
+  },
+
+  updateSectionName: (name) => {
+    set((state) => ({
+      section: {
+        ...state.section,
+        name,
+      },
+    }));
   },
 
   selectedId: "section-root",
@@ -254,6 +311,177 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
       },
       selectedId: "section-root",
     }));
+  },
+
+  duplicateElement: (elementId) => {
+    set((state) => {
+      const sourceElement = state.section.elements.find(
+        (element) => element.id === elementId
+      );
+
+      if (!sourceElement) {
+        return state;
+      }
+
+      const duplicatedElement = createDuplicatedElement(
+        sourceElement,
+        state.section
+      );
+
+      return {
+        section: {
+          ...state.section,
+          elements: [...state.section.elements, duplicatedElement],
+        },
+        selectedId: duplicatedElement.id,
+      };
+    });
+  },
+
+  moveSelectedElement: (deltaX, deltaY) => {
+    set((state) => {
+      if (!state.selectedId || state.selectedId === state.section.id) {
+        return state;
+      }
+
+      const selectedElementExists = state.section.elements.some(
+        (element) => element.id === state.selectedId
+      );
+
+      if (!selectedElementExists) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.map((element) => {
+            if (element.id !== state.selectedId) {
+              return element;
+            }
+
+            const maxX = Math.max(0, state.section.width - element.width);
+            const maxY = Math.max(0, state.section.height - element.height);
+
+            return {
+              ...element,
+              x: Math.min(Math.max(0, element.x + deltaX), maxX),
+              y: Math.min(Math.max(0, element.y + deltaY), maxY),
+            };
+          }),
+        },
+      };
+    });
+  },
+
+  bringSelectedElementForward: () => {
+    set((state) => {
+      if (!state.selectedId || state.selectedId === state.section.id) {
+        return state;
+      }
+
+      const currentIndex = state.section.elements.findIndex(
+        (element) => element.id === state.selectedId
+      );
+
+      if (
+        currentIndex === -1 ||
+        currentIndex === state.section.elements.length - 1
+      ) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: moveArrayItem(
+            state.section.elements,
+            currentIndex,
+            currentIndex + 1
+          ),
+        },
+      };
+    });
+  },
+
+  sendSelectedElementBackward: () => {
+    set((state) => {
+      if (!state.selectedId || state.selectedId === state.section.id) {
+        return state;
+      }
+
+      const currentIndex = state.section.elements.findIndex(
+        (element) => element.id === state.selectedId
+      );
+
+      if (currentIndex <= 0) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: moveArrayItem(
+            state.section.elements,
+            currentIndex,
+            currentIndex - 1
+          ),
+        },
+      };
+    });
+  },
+
+  bringSelectedElementToFront: () => {
+    set((state) => {
+      if (!state.selectedId || state.selectedId === state.section.id) {
+        return state;
+      }
+
+      const currentIndex = state.section.elements.findIndex(
+        (element) => element.id === state.selectedId
+      );
+
+      if (
+        currentIndex === -1 ||
+        currentIndex === state.section.elements.length - 1
+      ) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: moveArrayItem(
+            state.section.elements,
+            currentIndex,
+            state.section.elements.length - 1
+          ),
+        },
+      };
+    });
+  },
+
+  sendSelectedElementToBack: () => {
+    set((state) => {
+      if (!state.selectedId || state.selectedId === state.section.id) {
+        return state;
+      }
+
+      const currentIndex = state.section.elements.findIndex(
+        (element) => element.id === state.selectedId
+      );
+
+      if (currentIndex <= 0) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: moveArrayItem(state.section.elements, currentIndex, 0),
+        },
+      };
+    });
   },
 
   updateSectionBackground: (backgroundColor) => {
