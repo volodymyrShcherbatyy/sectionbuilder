@@ -42,6 +42,7 @@ type SectionEditorState = {
 
   resetSection: () => void;
   replaceSection: (section: Section) => void;
+  insertElementsFromSection: (sourceSection: Section) => void;
   updateSectionName: (name: string) => void;
   updateSectionSize: (width: number, height: number) => void;
   updateSectionBackground: (backgroundColor: string) => void;
@@ -199,6 +200,31 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
     set({
       section,
       selectedId: section.id,
+    });
+  },
+
+  insertElementsFromSection: (sourceSection) => {
+    set((state) => {
+      const insertedElements = sourceSection.elements.map((element) => ({
+        ...element,
+        id: `element-${crypto.randomUUID()}`,
+      }));
+
+      const nextWidth = Math.max(state.section.width, sourceSection.width);
+      const nextHeight = Math.max(state.section.height, sourceSection.height);
+
+      return {
+        section: {
+          ...state.section,
+          width: nextWidth,
+          height: nextHeight,
+          elements: [...state.section.elements, ...insertedElements],
+        },
+        selectedId:
+          insertedElements.length > 0
+            ? insertedElements[insertedElements.length - 1].id
+            : state.selectedId,
+      };
     });
   },
 

@@ -14,6 +14,10 @@ import { exportSectionToHtml } from "../../infrastructure/codegen/exportSectionT
 import { exportSectionToJson } from "../../infrastructure/codegen/exportSectionToJson";
 import { importSectionFromJson } from "../../infrastructure/codegen/importSectionFromJson";
 import { createSectionJsonFileName } from "../../infrastructure/codegen/createSectionJsonFileName";
+import { TemplatesModal } from "./TemplatesModal";
+import type { SectionTemplate } from "../../core/entities/SectionTemplate";
+import { cloneSectionTemplate } from "../../infrastructure/templates/cloneSectionTemplate";
+import { sectionTemplates } from "../../infrastructure/templates/sectionTemplates";
 
 const elementButtons: Array<{
   label: string;
@@ -30,11 +34,15 @@ export function SectionEditorPage() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isExportJsonModalOpen, setIsExportJsonModalOpen] = useState(false);
   const [isImportJsonModalOpen, setIsImportJsonModalOpen] = useState(false);
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
 
   const section = useSectionEditorStore((state) => state.section);
   const addElement = useSectionEditorStore((state) => state.addElement);
   const resetSection = useSectionEditorStore((state) => state.resetSection);
   const replaceSection = useSectionEditorStore((state) => state.replaceSection);
+  const insertElementsFromSection = useSectionEditorStore(
+    (state) => state.insertElementsFromSection
+  );
 
   const exportedCode = useMemo(() => {
     return exportSectionToHtml(section);
@@ -59,13 +67,36 @@ export function SectionEditorPage() {
     setIsImportJsonModalOpen(false);
   }
 
+  function handleUseTemplate(template: SectionTemplate) {
+    const clonedSection = cloneSectionTemplate(template);
+
+    if (!clonedSection) {
+      return;
+    }
+
+    replaceSection(clonedSection);
+    setIsTemplatesModalOpen(false);
+  }
+
+  function handleInsertTemplate(template: SectionTemplate) {
+    const clonedSection = cloneSectionTemplate(template);
+
+    if (!clonedSection) {
+      return;
+    }
+
+    insertElementsFromSection(clonedSection);
+    setIsTemplatesModalOpen(false);
+  }
+
   return (
     <div className="flex h-screen flex-col bg-slate-50">
       <LocalStorageSync />
 
-      {!isExportModalOpen && !isExportJsonModalOpen && !isImportJsonModalOpen && (
-        <KeyboardShortcuts />
-      )}
+      {!isExportModalOpen &&
+        !isExportJsonModalOpen &&
+        !isImportJsonModalOpen &&
+        !isTemplatesModalOpen && <KeyboardShortcuts />}
 
       {isExportModalOpen && (
         <ExportCodeModal
@@ -89,6 +120,15 @@ export function SectionEditorPage() {
         />
       )}
 
+      {isTemplatesModalOpen && (
+        <TemplatesModal
+          templates={sectionTemplates}
+          onClose={() => setIsTemplatesModalOpen(false)}
+          onUseTemplate={handleUseTemplate}
+          onInsertTemplate={handleInsertTemplate}
+        />
+      )}
+
       <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4">
         <div>
           <div className="text-sm font-semibold text-slate-900">
@@ -106,6 +146,14 @@ export function SectionEditorPage() {
             className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
           >
             Reset Section
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsTemplatesModalOpen(true)}
+            className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
+          >
+            Templates
           </button>
 
           <button
