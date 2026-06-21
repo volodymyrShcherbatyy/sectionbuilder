@@ -79,7 +79,11 @@ export function exportSectionToHtml(section: Section): string {
     `rounded-[${section.borderRadius}px]`,
   ].join(" ");
 
-  const elementsHtml = section.elements.map(exportElementToHtml).join("\n");
+  const visibleElements = section.elements.filter(
+    (element) => element.isVisible !== false
+  );
+
+  const elementsHtml = visibleElements.map(exportElementToHtml).join("\n");
 
   if (!elementsHtml) {
     return `<section class="${sectionClasses}"></section>`;

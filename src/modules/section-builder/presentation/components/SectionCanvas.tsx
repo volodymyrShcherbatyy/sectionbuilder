@@ -71,9 +71,11 @@ export function SectionCanvas() {
         {section.width} × {section.height}
       </div>
 
-      {section.elements.map((element) => (
-        <ElementRenderer key={element.id} element={element} />
-      ))}
+      {section.elements
+        .filter((element) => element.isVisible !== false)
+        .map((element) => (
+          <ElementRenderer key={element.id} element={element} />
+        ))}
 
       {isSelected && (
         <div

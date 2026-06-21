@@ -15,6 +15,8 @@ export type SectionElement = {
   borderColor: string;
   borderWidth: number;
   borderRadius: number;
+  isVisible?: boolean;
+  isLocked?: boolean;
 };
 
 export type Section = {

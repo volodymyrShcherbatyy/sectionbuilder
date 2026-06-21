@@ -26,12 +26,20 @@ function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === "boolean";
+}
+
 function isSectionElementType(value: unknown): value is SectionElementType {
   return isString(value) && sectionElementTypes.includes(value as SectionElementType);
 }
 
 function parseOptionalString(value: unknown): string | undefined {
   return isString(value) ? value : undefined;
+}
+
+function parseOptionalBoolean(value: unknown, fallback: boolean): boolean {
+  return isBoolean(value) ? value : fallback;
 }
 
 function parseSectionElement(value: unknown): SectionElement | null {
@@ -71,6 +79,8 @@ function parseSectionElement(value: unknown): SectionElement | null {
     borderColor: value.borderColor,
     borderWidth: Math.max(0, Math.round(value.borderWidth)),
     borderRadius: Math.max(0, Math.round(value.borderRadius)),
+    isVisible: parseOptionalBoolean(value.isVisible, true),
+    isLocked: parseOptionalBoolean(value.isLocked, false),
   };
 }
 

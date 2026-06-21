@@ -15,11 +15,16 @@ export function ElementRenderer({ element }: ElementRendererProps) {
   const updateElement = useSectionEditorStore((state) => state.updateElement);
 
   const isSelected = selectedId === element.id;
+  const isLocked = element.isLocked === true;
 
   function handlePointerDown(event: PointerEvent<HTMLElement>) {
     event.stopPropagation();
 
     selectElement(element.id);
+
+    if (isLocked) {
+      return;
+    }
 
     const target = event.currentTarget;
     target.setPointerCapture(event.pointerId);
@@ -61,6 +66,10 @@ export function ElementRenderer({ element }: ElementRendererProps) {
     event.stopPropagation();
 
     selectElement(element.id);
+
+    if (isLocked) {
+      return;
+    }
 
     const target = event.currentTarget;
     target.setPointerCapture(event.pointerId);
@@ -124,13 +133,13 @@ export function ElementRenderer({ element }: ElementRendererProps) {
   const className = [
     "absolute",
     "box-border",
-    "cursor-move",
+    isLocked ? "cursor-default" : "cursor-move",
     "text-xs",
     isSelected ? "ring-2 ring-blue-500" : "",
   ].join(" ");
 
   function renderResizeHandle() {
-    if (!isSelected) {
+    if (!isSelected || isLocked) {
       return null;
     }
 
@@ -142,6 +151,16 @@ export function ElementRenderer({ element }: ElementRendererProps) {
     );
   }
 
+  function renderLockIndicator() {
+    if (!isLocked) {
+      return null;
+    }
+
+    return (
+      <span className="ml-1 inline-block h-[5px] w-[5px] shrink-0 rounded-full bg-slate-900 align-middle" />
+    );
+  }
+
   if (element.type === "text") {
     return (
       <div
@@ -150,7 +169,8 @@ export function ElementRenderer({ element }: ElementRendererProps) {
         className={className}
         style={commonStyle}
       >
-        {element.text}
+        <span>{element.text}</span>
+        {renderLockIndicator()}
         {renderResizeHandle()}
       </div>
     );
@@ -165,7 +185,8 @@ export function ElementRenderer({ element }: ElementRendererProps) {
         className={className}
         style={commonStyle}
       >
-        {element.text}
+        <span>{element.text}</span>
+        {renderLockIndicator()}
         {renderResizeHandle()}
       </button>
     );
@@ -179,11 +200,14 @@ export function ElementRenderer({ element }: ElementRendererProps) {
         className={className}
         style={commonStyle}
       >
-        <input
-          readOnly
-          placeholder={element.placeholder}
-          className="h-full w-full bg-transparent px-2 outline-none"
-        />
+        <div className="flex h-full w-full items-center px-2">
+          <input
+            readOnly
+            placeholder={element.placeholder}
+            className="min-w-0 flex-1 bg-transparent outline-none"
+          />
+          {renderLockIndicator()}
+        </div>
         {renderResizeHandle()}
       </div>
     );
@@ -199,6 +223,7 @@ export function ElementRenderer({ element }: ElementRendererProps) {
       >
         <input type="checkbox" readOnly />
         <span>{element.text}</span>
+        {renderLockIndicator()}
         {renderResizeHandle()}
       </label>
     );
@@ -211,6 +236,7 @@ export function ElementRenderer({ element }: ElementRendererProps) {
       className={className}
       style={commonStyle}
     >
+      {renderLockIndicator()}
       {renderResizeHandle()}
     </div>
   );

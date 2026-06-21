@@ -30,6 +30,26 @@ export function KeyboardShortcuts() {
   );
 
   useEffect(() => {
+    function selectedElementExists() {
+      if (!selectedId || selectedId === section.id) {
+        return false;
+      }
+
+      return section.elements.some((element) => element.id === selectedId);
+    }
+
+    function selectedElementIsLocked() {
+      if (!selectedId || selectedId === section.id) {
+        return false;
+      }
+
+      const selectedElement = section.elements.find(
+        (element) => element.id === selectedId
+      );
+
+      return selectedElement?.isLocked === true;
+    }
+
     function handleKeyDown(event: KeyboardEvent) {
       const target = event.target;
 
@@ -92,15 +112,7 @@ export function KeyboardShortcuts() {
       const arrowKeyDelta = arrowKeyDeltas[event.key];
 
       if (arrowKeyDelta) {
-        if (!selectedId || selectedId === section.id) {
-          return;
-        }
-
-        const selectedElementExists = section.elements.some(
-          (element) => element.id === selectedId
-        );
-
-        if (!selectedElementExists) {
+        if (!selectedElementExists() || selectedElementIsLocked()) {
           return;
         }
 
@@ -118,20 +130,12 @@ export function KeyboardShortcuts() {
         event.key.toLowerCase() === "d" && (event.ctrlKey || event.metaKey);
 
       if (isDuplicateKey) {
-        if (!selectedId || selectedId === section.id) {
-          return;
-        }
-
-        const selectedElementExists = section.elements.some(
-          (element) => element.id === selectedId
-        );
-
-        if (!selectedElementExists) {
+        if (!selectedElementExists()) {
           return;
         }
 
         event.preventDefault();
-        duplicateElement(selectedId);
+        duplicateElement(selectedId as string);
         return;
       }
 
@@ -141,20 +145,12 @@ export function KeyboardShortcuts() {
         return;
       }
 
-      if (!selectedId || selectedId === section.id) {
-        return;
-      }
-
-      const selectedElementExists = section.elements.some(
-        (element) => element.id === selectedId
-      );
-
-      if (!selectedElementExists) {
+      if (!selectedElementExists() || selectedElementIsLocked()) {
         return;
       }
 
       event.preventDefault();
-      deleteElement(selectedId);
+      deleteElement(selectedId as string);
     }
 
     window.addEventListener("keydown", handleKeyDown);

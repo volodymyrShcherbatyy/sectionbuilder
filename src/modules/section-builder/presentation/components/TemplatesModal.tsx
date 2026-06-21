@@ -1,13 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SectionTemplate } from "../../core/entities/SectionTemplate";
 
+type TemplateSource = "predefined" | "custom";
+
+type TemplateListItem = {
+  template: SectionTemplate;
+  source: TemplateSource;
+};
+
 type TemplatesModalProps = {
-  templates: SectionTemplate[];
+  predefinedTemplates: SectionTemplate[];
+  customTemplates: SectionTemplate[];
   onClose: () => void;
   onUseTemplate: (template: SectionTemplate) => void;
   onInsertTemplate: (template: SectionTemplate) => void;
+  onDeleteCustomTemplate: (template: SectionTemplate) => void;
 };
 
 type TemplateCategoryFilter = SectionTemplate["category"] | "all";
@@ -28,6 +37,14 @@ function formatCategory(category: SectionTemplate["category"]): string {
   return "Content";
 }
 
+function formatSource(source: TemplateSource): string {
+  if (source === "custom") {
+    return "Custom";
+  }
+
+  return "Predefined";
+}
+
 const categoryFilters: Array<{
   label: string;
   value: TemplateCategoryFilter;
@@ -40,11 +57,16 @@ const categoryFilters: Array<{
 ];
 
 export function TemplatesModal({
-  templates,
+  predefinedTemplates,
+  customTemplates,
   onClose,
   onUseTemplate,
   onInsertTemplate,
+  onDeleteCustomTemplate,
 }: TemplatesModalProps) {
+  const [activeCategory, setActiveCategory] =
+    useState<TemplateCategoryFilter>("all");
+
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -59,13 +81,27 @@ export function TemplatesModal({
     };
   }, [onClose]);
 
-  const [activeCategory, setActiveCategory] =
-    useState<TemplateCategoryFilter>("all");
+  const templateItems = useMemo<TemplateListItem[]>(() => {
+    return [
+      ...predefinedTemplates.map((template) => ({
+        template,
+        source: "predefined" as const,
+      })),
+      ...customTemplates.map((template) => ({
+        template,
+        source: "custom" as const,
+      })),
+    ];
+  }, [customTemplates, predefinedTemplates]);
 
-  const visibleTemplates =
+  const visibleTemplateItems =
     activeCategory === "all"
-      ? templates
-      : templates.filter((template) => template.category === activeCategory);
+      ? templateItems
+      : templateItems.filter(
+          (item) => item.template.category === activeCategory
+        );
+
+  const hasCustomTemplates = customTemplates.length > 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-6">
@@ -76,7 +112,7 @@ export function TemplatesModal({
               Templates
             </h2>
             <p className="text-xs text-slate-500">
-              Choose a predefined section template.
+              Choose a predefined or custom section template.
             </p>
           </div>
 
@@ -112,73 +148,114 @@ export function TemplatesModal({
             })}
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            {visibleTemplates.map((template) => (
-              <article
-                key={template.id}
-                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-900">
-                      {template.name}
-                    </h3>
+          {!hasCustomTemplates && (
+            <div className="mb-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+              No custom templates yet. Use Save Template to create one from the
+              current section.
+            </div>
+          )}
 
-                    <div className="mt-1 text-xs font-medium uppercase text-slate-500">
-                      {formatCategory(template.category)}
+          {visibleTemplateItems.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-sm text-slate-500">
+              No templates in this category.
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {visibleTemplateItems.map(({ template, source }) => (
+                <article
+                  key={template.id}
+                  className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="truncate text-sm font-semibold text-slate-900">
+                          {template.name}
+                        </h3>
+
+                        <span
+                          className={[
+                            "rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase",
+                            source === "custom"
+                              ? "bg-blue-50 text-blue-700"
+                              : "bg-slate-100 text-slate-600",
+                          ].join(" ")}
+                        >
+                          {formatSource(source)}
+                        </span>
+                      </div>
+
+                      <div className="mt-1 text-xs font-medium uppercase text-slate-500">
+                        {formatCategory(template.category)}
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
+                      {template.section.width} × {template.section.height}
                     </div>
                   </div>
 
-                  <div className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                    {template.section.width} × {template.section.height}
+                  <p className="mt-3 text-sm text-slate-600">
+                    {template.description || "No description."}
+                  </p>
+
+                  <div className="mt-4 rounded-lg bg-slate-50 p-3">
+                    <div className="text-xs font-semibold uppercase text-slate-500">
+                      Preview summary
+                    </div>
+
+                    <div className="mt-2 text-xs text-slate-600">
+                      Elements: {template.section.elements.length}
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {template.section.elements.map((element) => (
+                        <span
+                          key={element.id}
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+                        >
+                          {element.type}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                <p className="mt-3 text-sm text-slate-600">
-                  {template.description}
-                </p>
+                  <div
+                    className={[
+                      "mt-4 grid gap-2",
+                      source === "custom" ? "grid-cols-3" : "grid-cols-2",
+                    ].join(" ")}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => onInsertTemplate(template)}
+                      className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Insert
+                    </button>
 
-                <div className="mt-4 rounded-lg bg-slate-50 p-3">
-                  <div className="text-xs font-semibold uppercase text-slate-500">
-                    Preview summary
-                  </div>
+                    <button
+                      type="button"
+                      onClick={() => onUseTemplate(template)}
+                      className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                      Replace
+                    </button>
 
-                  <div className="mt-2 text-xs text-slate-600">
-                    Elements: {template.section.elements.length}
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {template.section.elements.map((element) => (
-                      <span
-                        key={element.id}
-                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+                    {source === "custom" && (
+                      <button
+                        type="button"
+                        onClick={() => onDeleteCustomTemplate(template)}
+                        className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
                       >
-                        {element.type}
-                      </span>
-                    ))}
+                        Delete
+                      </button>
+                    )}
                   </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onInsertTemplate(template)}
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  >
-                    Insert
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => onUseTemplate(template)}
-                    className="rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-                  >
-                    Replace
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

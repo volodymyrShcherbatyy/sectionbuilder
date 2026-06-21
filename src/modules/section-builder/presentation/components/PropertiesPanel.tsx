@@ -46,7 +46,7 @@ export function PropertiesPanel() {
 
   if (selectedElement) {
     return (
-      <aside className="w-80 overflow-auto border-l border-slate-200 bg-white p-4">
+      <section className="min-h-0 flex-1 overflow-auto p-4">
         <h2 className="text-sm font-semibold text-slate-900">Properties</h2>
 
         <div className="mt-4 rounded-lg border border-slate-200 p-3">
@@ -81,47 +81,23 @@ export function PropertiesPanel() {
           </button>
         </div>
 
-        <div className="mt-3 rounded-lg border border-slate-200 p-3">
-          <div className="text-xs font-semibold uppercase text-slate-500">
-            Order
-          </div>
-
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={sendSelectedElementToBack}
-              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Send to back
-            </button>
-
-            <button
-              type="button"
-              onClick={bringSelectedElementToFront}
-              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Bring to front
-            </button>
-
-            <button
-              type="button"
-              onClick={sendSelectedElementBackward}
-              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Backward
-            </button>
-
-            <button
-              type="button"
-              onClick={bringSelectedElementForward}
-              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Forward
-            </button>
-          </div>
-        </div>
-
         <div className="mt-4 space-y-4">
+          <div>
+            <label className="text-xs font-medium text-slate-600">
+              Element name
+            </label>
+            <input
+              type="text"
+              value={selectedElement.name}
+              onChange={(event) =>
+                updateElement(selectedElement.id, {
+                  name: event.target.value,
+                })
+              }
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+            />
+          </div>
+
           {(selectedElement.type === "text" ||
             selectedElement.type === "button" ||
             selectedElement.type === "checkbox") && (
@@ -288,12 +264,52 @@ export function PropertiesPanel() {
             />
           </div>
         </div>
-      </aside>
+
+        <div className="mt-3 rounded-lg border border-slate-200 p-3">
+          <div className="text-xs font-semibold uppercase text-slate-500">
+            Order
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={sendSelectedElementToBack}
+              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Send to back
+            </button>
+
+            <button
+              type="button"
+              onClick={bringSelectedElementToFront}
+              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Bring to front
+            </button>
+
+            <button
+              type="button"
+              onClick={sendSelectedElementBackward}
+              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Backward
+            </button>
+
+            <button
+              type="button"
+              onClick={bringSelectedElementForward}
+              className="rounded-md border border-slate-300 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Forward
+            </button>
+          </div>
+        </div>
+      </section>
     );
   }
 
   return (
-    <aside className="w-80 overflow-auto border-l border-slate-200 bg-white p-4">
+    <section className="min-h-0 flex-1 overflow-auto p-4">
       <h2 className="text-sm font-semibold text-slate-900">Properties</h2>
 
       <div className="mt-4 rounded-lg border border-slate-200 p-3">
@@ -350,6 +366,6 @@ export function PropertiesPanel() {
           onCommit={(value) => updateSectionBorderRadius(value)}
         />
       </div>
-    </aside>
+    </section>
   );
 }

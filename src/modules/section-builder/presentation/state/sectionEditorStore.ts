@@ -5,9 +5,18 @@ import type {
   SectionElementType,
 } from "../../core/entities/Section";
 
+export type ElementAlignment =
+  | "left"
+  | "center-x"
+  | "right"
+  | "top"
+  | "center-y"
+  | "bottom";
+
 type UpdateElementPatch = Partial<
   Pick<
     SectionElement,
+    | "name"
     | "x"
     | "y"
     | "width"
@@ -19,6 +28,8 @@ type UpdateElementPatch = Partial<
     | "borderColor"
     | "borderWidth"
     | "borderRadius"
+    | "isVisible"
+    | "isLocked"
   >
 >;
 
@@ -34,11 +45,16 @@ type SectionEditorState = {
   deleteElement: (elementId: string) => void;
   duplicateElement: (elementId: string) => void;
   moveSelectedElement: (deltaX: number, deltaY: number) => void;
+  alignSelectedElement: (alignment: ElementAlignment) => void;
 
   bringSelectedElementForward: () => void;
   sendSelectedElementBackward: () => void;
   bringSelectedElementToFront: () => void;
   sendSelectedElementToBack: () => void;
+  moveElementForward: (elementId: string) => void;
+  moveElementBackward: (elementId: string) => void;
+  toggleElementVisibility: (elementId: string) => void;
+  toggleElementLock: (elementId: string) => void;
 
   resetSection: () => void;
   replaceSection: (section: Section) => void;
@@ -52,10 +68,16 @@ type SectionEditorState = {
 function createElement(type: SectionElementType): SectionElement {
   const id = `element-${crypto.randomUUID()}`;
 
+  const baseElement = {
+    id,
+    type,
+    isVisible: true,
+    isLocked: false,
+  };
+
   if (type === "text") {
     return {
-      id,
-      type,
+      ...baseElement,
       name: "Text",
       x: 10,
       y: 10,
@@ -72,8 +94,7 @@ function createElement(type: SectionElementType): SectionElement {
 
   if (type === "button") {
     return {
-      id,
-      type,
+      ...baseElement,
       name: "Button",
       x: 10,
       y: 10,
@@ -90,8 +111,7 @@ function createElement(type: SectionElementType): SectionElement {
 
   if (type === "input") {
     return {
-      id,
-      type,
+      ...baseElement,
       name: "Input",
       x: 10,
       y: 10,
@@ -108,8 +128,7 @@ function createElement(type: SectionElementType): SectionElement {
 
   if (type === "checkbox") {
     return {
-      id,
-      type,
+      ...baseElement,
       name: "Checkbox",
       x: 10,
       y: 10,
@@ -125,8 +144,7 @@ function createElement(type: SectionElementType): SectionElement {
   }
 
   return {
-    id,
-    type,
+    ...baseElement,
     name: "Box",
     x: 10,
     y: 10,
@@ -158,7 +176,10 @@ function createDuplicatedElement(
   element: SectionElement,
   section: Section
 ): SectionElement {
-  const nextX = Math.min(element.x + 10, Math.max(0, section.width - element.width));
+  const nextX = Math.min(
+    element.x + 10,
+    Math.max(0, section.width - element.width)
+  );
   const nextY = Math.min(
     element.y + 10,
     Math.max(0, section.height - element.height)
@@ -186,6 +207,76 @@ function moveArrayItem<T>(items: T[], fromIndex: number, toIndex: number): T[] {
   return nextItems;
 }
 
+function isElementVisible(element: SectionElement): boolean {
+  return element.isVisible !== false;
+}
+
+function isElementLocked(element: SectionElement): boolean {
+  return element.isLocked === true;
+}
+
+function clampElementX(section: Section, element: SectionElement, x: number) {
+  return Math.min(Math.max(0, x), Math.max(0, section.width - element.width));
+}
+
+function clampElementY(section: Section, element: SectionElement, y: number) {
+  return Math.min(Math.max(0, y), Math.max(0, section.height - element.height));
+}
+
+function getAlignedPosition(
+  section: Section,
+  element: SectionElement,
+  alignment: ElementAlignment
+): Pick<SectionElement, "x" | "y"> {
+  if (alignment === "left") {
+    return {
+      x: 0,
+      y: element.y,
+    };
+  }
+
+  if (alignment === "center-x") {
+    return {
+      x: clampElementX(
+        section,
+        element,
+        Math.round((section.width - element.width) / 2)
+      ),
+      y: element.y,
+    };
+  }
+
+  if (alignment === "right") {
+    return {
+      x: clampElementX(section, element, section.width - element.width),
+      y: element.y,
+    };
+  }
+
+  if (alignment === "top") {
+    return {
+      x: element.x,
+      y: 0,
+    };
+  }
+
+  if (alignment === "center-y") {
+    return {
+      x: element.x,
+      y: clampElementY(
+        section,
+        element,
+        Math.round((section.height - element.height) / 2)
+      ),
+    };
+  }
+
+  return {
+    x: element.x,
+    y: clampElementY(section, element, section.height - element.height),
+  };
+}
+
 export const useSectionEditorStore = create<SectionEditorState>((set) => ({
   section: createEmptySection(),
 
@@ -208,6 +299,8 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
       const insertedElements = sourceSection.elements.map((element) => ({
         ...element,
         id: `element-${crypto.randomUUID()}`,
+        isVisible: isElementVisible(element),
+        isLocked: isElementLocked(element),
       }));
 
       const nextWidth = Math.max(state.section.width, sourceSection.width);
@@ -328,15 +421,25 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
   },
 
   deleteElement: (elementId) => {
-    set((state) => ({
-      section: {
-        ...state.section,
-        elements: state.section.elements.filter(
-          (element) => element.id !== elementId
-        ),
-      },
-      selectedId: "section-root",
-    }));
+    set((state) => {
+      const selectedElement = state.section.elements.find(
+        (element) => element.id === elementId
+      );
+
+      if (!selectedElement || isElementLocked(selectedElement)) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.filter(
+            (element) => element.id !== elementId
+          ),
+        },
+        selectedId: "section-root",
+      };
+    });
   },
 
   duplicateElement: (elementId) => {
@@ -370,11 +473,11 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
         return state;
       }
 
-      const selectedElementExists = state.section.elements.some(
+      const selectedElement = state.section.elements.find(
         (element) => element.id === state.selectedId
       );
 
-      if (!selectedElementExists) {
+      if (!selectedElement || isElementLocked(selectedElement)) {
         return state;
       }
 
@@ -393,6 +496,45 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
               ...element,
               x: Math.min(Math.max(0, element.x + deltaX), maxX),
               y: Math.min(Math.max(0, element.y + deltaY), maxY),
+            };
+          }),
+        },
+      };
+    });
+  },
+
+  alignSelectedElement: (alignment) => {
+    set((state) => {
+      if (!state.selectedId || state.selectedId === state.section.id) {
+        return state;
+      }
+
+      const selectedElement = state.section.elements.find(
+        (element) => element.id === state.selectedId
+      );
+
+      if (!selectedElement || isElementLocked(selectedElement)) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.map((element) => {
+            if (element.id !== state.selectedId) {
+              return element;
+            }
+
+            const alignedPosition = getAlignedPosition(
+              state.section,
+              element,
+              alignment
+            );
+
+            return {
+              ...element,
+              x: alignedPosition.x,
+              y: alignedPosition.y,
             };
           }),
         },
@@ -508,6 +650,91 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
         },
       };
     });
+  },
+
+  moveElementForward: (elementId) => {
+    set((state) => {
+      const currentIndex = state.section.elements.findIndex(
+        (element) => element.id === elementId
+      );
+
+      if (
+        currentIndex === -1 ||
+        currentIndex === state.section.elements.length - 1
+      ) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: moveArrayItem(
+            state.section.elements,
+            currentIndex,
+            currentIndex + 1
+          ),
+        },
+        selectedId: elementId,
+      };
+    });
+  },
+
+  moveElementBackward: (elementId) => {
+    set((state) => {
+      const currentIndex = state.section.elements.findIndex(
+        (element) => element.id === elementId
+      );
+
+      if (currentIndex <= 0) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: moveArrayItem(
+            state.section.elements,
+            currentIndex,
+            currentIndex - 1
+          ),
+        },
+        selectedId: elementId,
+      };
+    });
+  },
+
+  toggleElementVisibility: (elementId) => {
+    set((state) => ({
+      section: {
+        ...state.section,
+        elements: state.section.elements.map((element) =>
+          element.id === elementId
+            ? {
+                ...element,
+                isVisible: !isElementVisible(element),
+              }
+            : element
+        ),
+      },
+      selectedId: elementId,
+    }));
+  },
+
+  toggleElementLock: (elementId) => {
+    set((state) => ({
+      section: {
+        ...state.section,
+        elements: state.section.elements.map((element) =>
+          element.id === elementId
+            ? {
+                ...element,
+                isLocked: !isElementLocked(element),
+              }
+            : element
+        ),
+      },
+      selectedId: elementId,
+    }));
   },
 
   updateSectionBackground: (backgroundColor) => {
