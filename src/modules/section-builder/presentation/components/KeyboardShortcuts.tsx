@@ -6,10 +6,13 @@ import { useSectionEditorStore } from "../state/sectionEditorStore";
 export function KeyboardShortcuts() {
   const section = useSectionEditorStore((state) => state.section);
   const selectedId = useSectionEditorStore((state) => state.selectedId);
-  const deleteElement = useSectionEditorStore((state) => state.deleteElement);
+  const selectedIds = useSectionEditorStore((state) => state.selectedIds);
 
-  const duplicateElement = useSectionEditorStore(
-    (state) => state.duplicateElement
+  const deleteSelectedElements = useSectionEditorStore(
+    (state) => state.deleteSelectedElements
+  );
+  const duplicateSelectedElements = useSectionEditorStore(
+    (state) => state.duplicateSelectedElements
   );
 
   const moveSelectedElement = useSectionEditorStore(
@@ -30,24 +33,43 @@ export function KeyboardShortcuts() {
   );
 
   useEffect(() => {
-    function selectedElementExists() {
-      if (!selectedId || selectedId === section.id) {
-        return false;
+    function getSelectedElementIds() {
+      if (selectedIds.length > 0) {
+        return selectedIds;
       }
 
-      return section.elements.some((element) => element.id === selectedId);
+      if (!selectedId || selectedId === section.id) {
+        return [];
+      }
+
+      return [selectedId];
     }
 
-    function selectedElementIsLocked() {
-      if (!selectedId || selectedId === section.id) {
+    function selectedElementsExist() {
+      const selectedElementIds = getSelectedElementIds();
+
+      if (selectedElementIds.length === 0) {
         return false;
       }
 
-      const selectedElement = section.elements.find(
-        (element) => element.id === selectedId
+      return section.elements.some((element) =>
+        selectedElementIds.includes(element.id)
       );
+    }
 
-      return selectedElement?.isLocked === true;
+    function selectedEditableElementsExist() {
+      const selectedElementIds = getSelectedElementIds();
+
+      if (selectedElementIds.length === 0) {
+        return false;
+      }
+
+      return section.elements.some(
+        (element) =>
+          selectedElementIds.includes(element.id) &&
+          element.isVisible !== false &&
+          element.isLocked !== true
+      );
     }
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -112,7 +134,7 @@ export function KeyboardShortcuts() {
       const arrowKeyDelta = arrowKeyDeltas[event.key];
 
       if (arrowKeyDelta) {
-        if (!selectedElementExists() || selectedElementIsLocked()) {
+        if (!selectedEditableElementsExist()) {
           return;
         }
 
@@ -130,12 +152,12 @@ export function KeyboardShortcuts() {
         event.key.toLowerCase() === "d" && (event.ctrlKey || event.metaKey);
 
       if (isDuplicateKey) {
-        if (!selectedElementExists()) {
+        if (!selectedElementsExist()) {
           return;
         }
 
         event.preventDefault();
-        duplicateElement(selectedId as string);
+        duplicateSelectedElements();
         return;
       }
 
@@ -145,12 +167,12 @@ export function KeyboardShortcuts() {
         return;
       }
 
-      if (!selectedElementExists() || selectedElementIsLocked()) {
+      if (!selectedElementsExist()) {
         return;
       }
 
       event.preventDefault();
-      deleteElement(selectedId as string);
+      deleteSelectedElements();
     }
 
     window.addEventListener("keydown", handleKeyDown);
@@ -161,12 +183,13 @@ export function KeyboardShortcuts() {
   }, [
     bringSelectedElementForward,
     bringSelectedElementToFront,
-    deleteElement,
-    duplicateElement,
+    deleteSelectedElements,
+    duplicateSelectedElements,
     moveSelectedElement,
     section.elements,
     section.id,
     selectedId,
+    selectedIds,
     sendSelectedElementBackward,
     sendSelectedElementToBack,
   ]);

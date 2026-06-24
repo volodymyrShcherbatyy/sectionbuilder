@@ -115,7 +115,11 @@ function UnlockIcon() {
 export function LayersPanel() {
   const section = useSectionEditorStore((state) => state.section);
   const selectedId = useSectionEditorStore((state) => state.selectedId);
+  const selectedIds = useSectionEditorStore((state) => state.selectedIds);
   const selectElement = useSectionEditorStore((state) => state.selectElement);
+  const toggleElementSelection = useSectionEditorStore(
+    (state) => state.toggleElementSelection
+  );
   const moveElementForward = useSectionEditorStore(
     (state) => state.moveElementForward
   );
@@ -138,10 +142,10 @@ export function LayersPanel() {
 
   if (section.elements.length === 0) {
     return (
-      <section className="h-[200px] shrink-0 border-b border-slate-200 p-3">
+      <section className="flex min-h-0 flex-1 flex-col p-4">
         <h2 className="text-sm font-semibold text-slate-900">Layers</h2>
 
-        <div className="mt-3 rounded-lg border border-dashed border-slate-300 px-3 py-4 text-xs text-slate-500">
+        <div className="mt-4 rounded-lg border border-dashed border-slate-300 px-3 py-4 text-xs text-slate-500">
           No elements yet.
         </div>
       </section>
@@ -149,12 +153,13 @@ export function LayersPanel() {
   }
 
   return (
-    <section className="flex h-[200px] shrink-0 flex-col border-b border-slate-200 p-3">
+    <section className="flex min-h-0 flex-1 flex-col p-4">
       <h2 className="text-sm font-semibold text-slate-900">Layers</h2>
 
-      <div className="mt-2 min-h-0 flex-1 space-y-1 overflow-auto pr-1">
+      <div className="mt-3 min-h-0 flex-1 space-y-1 overflow-auto pr-1">
         {layerItems.map(({ element, index }) => {
-          const isSelected = selectedId === element.id;
+          const isSelected = selectedIds.includes(element.id);
+          const isPrimarySelected = selectedId === element.id;
           const isTopLayer = index === section.elements.length - 1;
           const isBottomLayer = index === 0;
           const isVisible = element.isVisible !== false;
@@ -165,13 +170,24 @@ export function LayersPanel() {
               key={element.id}
               className={[
                 "rounded-md border bg-white",
-                isSelected ? "border-blue-500 bg-blue-50" : "border-slate-200",
+                isPrimarySelected
+                  ? "border-blue-600 bg-blue-50"
+                  : isSelected
+                    ? "border-blue-300 bg-blue-50"
+                    : "border-slate-200",
                 !isVisible ? "opacity-60" : "",
               ].join(" ")}
             >
               <button
                 type="button"
-                onClick={() => selectElement(element.id)}
+                onClick={(event) => {
+                  if (event.ctrlKey || event.metaKey) {
+                    toggleElementSelection(element.id);
+                    return;
+                  }
+
+                  selectElement(element.id);
+                }}
                 className="w-full px-2 py-1.5 text-left hover:bg-slate-50"
               >
                 <div className="flex items-center justify-between gap-2">
@@ -182,6 +198,12 @@ export function LayersPanel() {
 
                     <div className="mt-0.5 flex flex-wrap gap-1 text-[10px] text-slate-500">
                       <span>{element.type}</span>
+
+                      {isPrimarySelected && selectedIds.length > 1 && (
+                        <span className="rounded bg-blue-600 px-1 uppercase text-white">
+                          primary
+                        </span>
+                      )}
 
                       {!isVisible && (
                         <span className="rounded bg-slate-200 px-1 uppercase text-slate-600">

@@ -6,6 +6,7 @@ import { useSectionEditorStore } from "../state/sectionEditorStore";
 export function PropertiesPanel() {
   const section = useSectionEditorStore((state) => state.section);
   const selectedId = useSectionEditorStore((state) => state.selectedId);
+  const selectedIds = useSectionEditorStore((state) => state.selectedIds);
 
   const updateSectionSize = useSectionEditorStore(
     (state) => state.updateSectionSize
@@ -22,9 +23,28 @@ export function PropertiesPanel() {
   const updateElement = useSectionEditorStore((state) => state.updateElement);
 
   const deleteElement = useSectionEditorStore((state) => state.deleteElement);
+  const deleteSelectedElements = useSectionEditorStore(
+    (state) => state.deleteSelectedElements
+  );
 
   const duplicateElement = useSectionEditorStore(
     (state) => state.duplicateElement
+  );
+  const duplicateSelectedElements = useSectionEditorStore(
+    (state) => state.duplicateSelectedElements
+  );
+
+  const hideSelectedElements = useSectionEditorStore(
+    (state) => state.hideSelectedElements
+  );
+  const showSelectedElements = useSectionEditorStore(
+    (state) => state.showSelectedElements
+  );
+  const lockSelectedElements = useSectionEditorStore(
+    (state) => state.lockSelectedElements
+  );
+  const unlockSelectedElements = useSectionEditorStore(
+    (state) => state.unlockSelectedElements
   );
 
   const bringSelectedElementForward = useSectionEditorStore(
@@ -43,6 +63,137 @@ export function PropertiesPanel() {
   const selectedElement = section.elements.find(
     (element) => element.id === selectedId
   );
+
+  if (selectedIds.length > 1) {
+    const selectedElements = section.elements.filter((element) =>
+      selectedIds.includes(element.id)
+    );
+
+    const lockedSelectedCount = selectedElements.filter(
+      (element) => element.isLocked === true
+    ).length;
+
+    const unlockedSelectedCount =
+      selectedElements.length - lockedSelectedCount;
+
+    const visibleSelectedCount = selectedElements.filter(
+      (element) => element.isVisible !== false
+    ).length;
+
+    const hiddenSelectedCount = selectedElements.length - visibleSelectedCount;
+
+    const deletableSelectedCount = unlockedSelectedCount;
+
+    return (
+      <section className="min-h-0 flex-1 overflow-auto p-4">
+        <h2 className="text-sm font-semibold text-slate-900">Properties</h2>
+
+        <div className="mt-4 rounded-lg border border-slate-200 p-3">
+          <div className="text-xs font-semibold uppercase text-slate-500">
+            Selected
+          </div>
+
+          <div className="mt-1 text-sm text-slate-900">
+            Multiple elements selected
+          </div>
+
+          <div className="mt-1 text-xs text-slate-500">
+            Count: {selectedIds.length}
+          </div>
+
+          {selectedElement && (
+            <div className="mt-2 rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-700">
+              Primary: {selectedElement.name}
+            </div>
+          )}
+
+          <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+            <div className="rounded-md bg-slate-50 px-2 py-1">
+              Visible: {visibleSelectedCount}
+            </div>
+
+            <div className="rounded-md bg-slate-50 px-2 py-1">
+              Hidden: {hiddenSelectedCount}
+            </div>
+
+            <div className="rounded-md bg-slate-50 px-2 py-1">
+              Locked: {lockedSelectedCount}
+            </div>
+
+            <div className="rounded-md bg-slate-50 px-2 py-1">
+              Unlocked: {unlockedSelectedCount}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-lg border border-slate-200 p-3">
+          <div className="text-xs font-semibold uppercase text-slate-500">
+            Bulk actions
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={duplicateSelectedElements}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Duplicate selected
+            </button>
+
+            <button
+              type="button"
+              onClick={deleteSelectedElements}
+              disabled={deletableSelectedCount === 0}
+              className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-transparent"
+            >
+              Delete selected
+            </button>
+
+            <button
+              type="button"
+              onClick={hideSelectedElements}
+              disabled={visibleSelectedCount === 0}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-transparent"
+            >
+              Hide selected
+            </button>
+
+            <button
+              type="button"
+              onClick={showSelectedElements}
+              disabled={hiddenSelectedCount === 0}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-transparent"
+            >
+              Show selected
+            </button>
+
+            <button
+              type="button"
+              onClick={lockSelectedElements}
+              disabled={unlockedSelectedCount === 0}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-transparent"
+            >
+              Lock selected
+            </button>
+
+            <button
+              type="button"
+              onClick={unlockSelectedElements}
+              disabled={lockedSelectedCount === 0}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-transparent"
+            >
+              Unlock selected
+            </button>
+          </div>
+
+          <div className="mt-3 text-xs text-slate-500">
+            Arrow keys move visible unlocked selected elements as one group.
+            Delete skips locked elements.
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (selectedElement) {
     return (

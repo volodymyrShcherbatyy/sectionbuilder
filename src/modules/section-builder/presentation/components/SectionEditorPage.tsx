@@ -7,9 +7,8 @@ import { ExportCodeModal } from "./ExportCodeModal";
 import { ExportJsonModal } from "./ExportJsonModal";
 import { ImportJsonModal } from "./ImportJsonModal";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
-import { LayersPanel } from "./LayersPanel";
 import { LocalStorageSync } from "./LocalStorageSync";
-import { PropertiesPanel } from "./PropertiesPanel";
+import { RightInspectorPanel } from "./RightInspectorPanel";
 import {
   SaveTemplateModal,
   type SaveTemplateFormValues,
@@ -196,9 +195,9 @@ export function SectionEditorPage() {
         />
       )}
 
-      <header className="flex h-14 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4">
-        <div className="flex min-w-0 items-center gap-4">
-          <div className="min-w-44">
+      <header className="flex h-[76px] items-center justify-between gap-4 border-b border-slate-200 bg-white px-4">
+        <div className="flex min-w-0 flex-1 items-center gap-4">
+          <div className="min-w-44 shrink-0">
             <div className="text-sm font-semibold text-slate-900">
               sectionbuilder
             </div>
@@ -284,8 +283,7 @@ export function SectionEditorPage() {
         <EditorCanvas />
 
         <aside className="flex w-80 min-h-0 flex-col border-l border-slate-200 bg-white">
-          <LayersPanel />
-          <PropertiesPanel />
+          <RightInspectorPanel />
         </aside>
       </div>
     </div>

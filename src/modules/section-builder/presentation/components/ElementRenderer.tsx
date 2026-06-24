@@ -10,15 +10,27 @@ type ElementRendererProps = {
 
 export function ElementRenderer({ element }: ElementRendererProps) {
   const section = useSectionEditorStore((state) => state.section);
+  const selectedIds = useSectionEditorStore((state) => state.selectedIds);
   const selectedId = useSectionEditorStore((state) => state.selectedId);
   const selectElement = useSectionEditorStore((state) => state.selectElement);
+  const toggleElementSelection = useSectionEditorStore(
+    (state) => state.toggleElementSelection
+  );
   const updateElement = useSectionEditorStore((state) => state.updateElement);
 
-  const isSelected = selectedId === element.id;
+  const isSelected = selectedIds.includes(element.id);
+  const isPrimarySelected = selectedId === element.id;
   const isLocked = element.isLocked === true;
+  const shouldShowPrimaryBadge = isPrimarySelected && selectedIds.length > 1;
 
   function handlePointerDown(event: PointerEvent<HTMLElement>) {
     event.stopPropagation();
+
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      toggleElementSelection(element.id);
+      return;
+    }
 
     selectElement(element.id);
 
@@ -112,6 +124,11 @@ export function ElementRenderer({ element }: ElementRendererProps) {
 
   function handleClick(event: MouseEvent<HTMLElement>) {
     event.stopPropagation();
+
+    if (event.ctrlKey || event.metaKey) {
+      return;
+    }
+
     selectElement(element.id);
   }
 
@@ -136,10 +153,11 @@ export function ElementRenderer({ element }: ElementRendererProps) {
     isLocked ? "cursor-default" : "cursor-move",
     "text-xs",
     isSelected ? "ring-2 ring-blue-500" : "",
+    isPrimarySelected && selectedIds.length > 1 ? "ring-offset-2" : "",
   ].join(" ");
 
   function renderResizeHandle() {
-    if (!isSelected || isLocked) {
+    if (!isPrimarySelected || selectedIds.length > 1 || isLocked) {
       return null;
     }
 
@@ -161,6 +179,18 @@ export function ElementRenderer({ element }: ElementRendererProps) {
     );
   }
 
+  function renderPrimaryBadge() {
+    if (!shouldShowPrimaryBadge) {
+      return null;
+    }
+
+    return (
+      <div className="pointer-events-none absolute -top-5 left-0 z-20 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-white shadow-sm">
+        Primary
+      </div>
+    );
+  }
+
   if (element.type === "text") {
     return (
       <div
@@ -169,6 +199,7 @@ export function ElementRenderer({ element }: ElementRendererProps) {
         className={className}
         style={commonStyle}
       >
+        {renderPrimaryBadge()}
         <span>{element.text}</span>
         {renderLockIndicator()}
         {renderResizeHandle()}
@@ -185,6 +216,7 @@ export function ElementRenderer({ element }: ElementRendererProps) {
         className={className}
         style={commonStyle}
       >
+        {renderPrimaryBadge()}
         <span>{element.text}</span>
         {renderLockIndicator()}
         {renderResizeHandle()}
@@ -200,6 +232,7 @@ export function ElementRenderer({ element }: ElementRendererProps) {
         className={className}
         style={commonStyle}
       >
+        {renderPrimaryBadge()}
         <div className="flex h-full w-full items-center px-2">
           <input
             readOnly
@@ -221,6 +254,7 @@ export function ElementRenderer({ element }: ElementRendererProps) {
         className={`${className} flex items-center gap-2`}
         style={commonStyle}
       >
+        {renderPrimaryBadge()}
         <input type="checkbox" readOnly />
         <span>{element.text}</span>
         {renderLockIndicator()}
@@ -236,6 +270,7 @@ export function ElementRenderer({ element }: ElementRendererProps) {
       className={className}
       style={commonStyle}
     >
+      {renderPrimaryBadge()}
       {renderLockIndicator()}
       {renderResizeHandle()}
     </div>

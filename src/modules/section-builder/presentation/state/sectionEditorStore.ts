@@ -36,16 +36,34 @@ type UpdateElementPatch = Partial<
 type SectionEditorState = {
   section: Section;
   selectedId: string | null;
+  selectedIds: string[];
 
   selectSection: () => void;
   selectElement: (elementId: string) => void;
+  toggleElementSelection: (elementId: string) => void;
 
   addElement: (type: SectionElementType) => void;
   updateElement: (elementId: string, patch: UpdateElementPatch) => void;
+
   deleteElement: (elementId: string) => void;
+  deleteSelectedElements: () => void;
+
   duplicateElement: (elementId: string) => void;
+  duplicateSelectedElements: () => void;
+
   moveSelectedElement: (deltaX: number, deltaY: number) => void;
+
   alignSelectedElement: (alignment: ElementAlignment) => void;
+  alignSelectedElementsToPrimary: (alignment: ElementAlignment) => void;
+  distributeSelectedElementsHorizontally: () => void;
+  distributeSelectedElementsVertically: () => void;
+  matchSelectedElementsWidthToPrimary: () => void;
+  matchSelectedElementsHeightToPrimary: () => void;
+
+  hideSelectedElements: () => void;
+  showSelectedElements: () => void;
+  lockSelectedElements: () => void;
+  unlockSelectedElements: () => void;
 
   bringSelectedElementForward: () => void;
   sendSelectedElementBackward: () => void;
@@ -215,6 +233,10 @@ function isElementLocked(element: SectionElement): boolean {
   return element.isLocked === true;
 }
 
+function isElementEditable(element: SectionElement): boolean {
+  return isElementVisible(element) && !isElementLocked(element);
+}
+
 function clampElementX(section: Section, element: SectionElement, x: number) {
   return Math.min(Math.max(0, x), Math.max(0, section.width - element.width));
 }
@@ -223,7 +245,26 @@ function clampElementY(section: Section, element: SectionElement, y: number) {
   return Math.min(Math.max(0, y), Math.max(0, section.height - element.height));
 }
 
-function getAlignedPosition(
+function clampElementWidth(
+  section: Section,
+  element: SectionElement,
+  width: number
+) {
+  return Math.min(Math.max(10, width), Math.max(10, section.width - element.x));
+}
+
+function clampElementHeight(
+  section: Section,
+  element: SectionElement,
+  height: number
+) {
+  return Math.min(
+    Math.max(10, height),
+    Math.max(10, section.height - element.y)
+  );
+}
+
+function getAlignedPositionToSection(
   section: Section,
   element: SectionElement,
   alignment: ElementAlignment
@@ -277,13 +318,173 @@ function getAlignedPosition(
   };
 }
 
+function getAlignedPositionToPrimary(
+  section: Section,
+  element: SectionElement,
+  primaryElement: SectionElement,
+  alignment: ElementAlignment
+): Pick<SectionElement, "x" | "y"> {
+  if (alignment === "left") {
+    return {
+      x: clampElementX(section, element, primaryElement.x),
+      y: element.y,
+    };
+  }
+
+  if (alignment === "center-x") {
+    const primaryCenterX = primaryElement.x + primaryElement.width / 2;
+
+    return {
+      x: clampElementX(
+        section,
+        element,
+        Math.round(primaryCenterX - element.width / 2)
+      ),
+      y: element.y,
+    };
+  }
+
+  if (alignment === "right") {
+    const primaryRight = primaryElement.x + primaryElement.width;
+
+    return {
+      x: clampElementX(section, element, primaryRight - element.width),
+      y: element.y,
+    };
+  }
+
+  if (alignment === "top") {
+    return {
+      x: element.x,
+      y: clampElementY(section, element, primaryElement.y),
+    };
+  }
+
+  if (alignment === "center-y") {
+    const primaryCenterY = primaryElement.y + primaryElement.height / 2;
+
+    return {
+      x: element.x,
+      y: clampElementY(
+        section,
+        element,
+        Math.round(primaryCenterY - element.height / 2)
+      ),
+    };
+  }
+
+  const primaryBottom = primaryElement.y + primaryElement.height;
+
+  return {
+    x: element.x,
+    y: clampElementY(section, element, primaryBottom - element.height),
+  };
+}
+
+function getSelectedElementIds(state: {
+  selectedId: string | null;
+  selectedIds: string[];
+  section: Section;
+}): string[] {
+  if (state.selectedIds.length > 0) {
+    return state.selectedIds;
+  }
+
+  if (!state.selectedId || state.selectedId === state.section.id) {
+    return [];
+  }
+
+  return [state.selectedId];
+}
+
+function getEditableSelectedElements(state: {
+  section: Section;
+  selectedId: string | null;
+  selectedIds: string[];
+}): SectionElement[] {
+  const selectedElementIds = getSelectedElementIds(state);
+
+  if (selectedElementIds.length === 0) {
+    return [];
+  }
+
+  return state.section.elements.filter(
+    (element) =>
+      selectedElementIds.includes(element.id) && isElementEditable(element)
+  );
+}
+
+function getSelectedElements(state: {
+  section: Section;
+  selectedId: string | null;
+  selectedIds: string[];
+}): SectionElement[] {
+  const selectedElementIds = getSelectedElementIds(state);
+
+  if (selectedElementIds.length === 0) {
+    return [];
+  }
+
+  return state.section.elements.filter((element) =>
+    selectedElementIds.includes(element.id)
+  );
+}
+
+function getNextSelectedIdsAfterDelete(
+  selectedIds: string[],
+  deletedElementId: string
+): string[] {
+  return selectedIds.filter((selectedId) => selectedId !== deletedElementId);
+}
+
+function getGroupClampedDelta(
+  section: Section,
+  elements: SectionElement[],
+  deltaX: number,
+  deltaY: number
+): { deltaX: number; deltaY: number } {
+  if (elements.length === 0) {
+    return {
+      deltaX: 0,
+      deltaY: 0,
+    };
+  }
+
+  const minX = Math.min(...elements.map((element) => element.x));
+  const minY = Math.min(...elements.map((element) => element.y));
+  const maxX = Math.max(
+    ...elements.map((element) => element.x + element.width)
+  );
+  const maxY = Math.max(
+    ...elements.map((element) => element.y + element.height)
+  );
+
+  const clampedDeltaX = Math.min(
+    Math.max(deltaX, -minX),
+    section.width - maxX
+  );
+
+  const clampedDeltaY = Math.min(
+    Math.max(deltaY, -minY),
+    section.height - maxY
+  );
+
+  return {
+    deltaX: clampedDeltaX,
+    deltaY: clampedDeltaY,
+  };
+}
+
 export const useSectionEditorStore = create<SectionEditorState>((set) => ({
   section: createEmptySection(),
+  selectedId: "section-root",
+  selectedIds: [],
 
   resetSection: () => {
     set({
       section: createEmptySection(),
       selectedId: "section-root",
+      selectedIds: [],
     });
   },
 
@@ -291,6 +492,7 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
     set({
       section,
       selectedId: section.id,
+      selectedIds: [],
     });
   },
 
@@ -305,6 +507,7 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
 
       const nextWidth = Math.max(state.section.width, sourceSection.width);
       const nextHeight = Math.max(state.section.height, sourceSection.height);
+      const lastInsertedElement = insertedElements[insertedElements.length - 1];
 
       return {
         section: {
@@ -313,10 +516,8 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
           height: nextHeight,
           elements: [...state.section.elements, ...insertedElements],
         },
-        selectedId:
-          insertedElements.length > 0
-            ? insertedElements[insertedElements.length - 1].id
-            : state.selectedId,
+        selectedId: lastInsertedElement?.id ?? state.selectedId,
+        selectedIds: lastInsertedElement ? [lastInsertedElement.id] : [],
       };
     });
   },
@@ -330,17 +531,42 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
     }));
   },
 
-  selectedId: "section-root",
-
   selectSection: () => {
     set({
       selectedId: "section-root",
+      selectedIds: [],
     });
   },
 
   selectElement: (elementId) => {
     set({
       selectedId: elementId,
+      selectedIds: [elementId],
+    });
+  },
+
+  toggleElementSelection: (elementId) => {
+    set((state) => {
+      const isAlreadySelected = state.selectedIds.includes(elementId);
+
+      if (isAlreadySelected) {
+        const nextSelectedIds = state.selectedIds.filter(
+          (selectedId) => selectedId !== elementId
+        );
+
+        return {
+          selectedId:
+            nextSelectedIds.length > 0
+              ? nextSelectedIds[nextSelectedIds.length - 1]
+              : "section-root",
+          selectedIds: nextSelectedIds,
+        };
+      }
+
+      return {
+        selectedId: elementId,
+        selectedIds: [...state.selectedIds, elementId],
+      };
     });
   },
 
@@ -353,6 +579,7 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
         elements: [...state.section.elements, element],
       },
       selectedId: element.id,
+      selectedIds: [element.id],
     }));
   },
 
@@ -430,6 +657,11 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
         return state;
       }
 
+      const nextSelectedIds = getNextSelectedIdsAfterDelete(
+        state.selectedIds,
+        elementId
+      );
+
       return {
         section: {
           ...state.section,
@@ -437,7 +669,46 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
             (element) => element.id !== elementId
           ),
         },
+        selectedId:
+          nextSelectedIds.length > 0
+            ? nextSelectedIds[nextSelectedIds.length - 1]
+            : "section-root",
+        selectedIds: nextSelectedIds,
+      };
+    });
+  },
+
+  deleteSelectedElements: () => {
+    set((state) => {
+      const selectedElementIds = getSelectedElementIds(state);
+
+      if (selectedElementIds.length === 0) {
+        return state;
+      }
+
+      const deletableSelectedIds = new Set(
+        state.section.elements
+          .filter(
+            (element) =>
+              selectedElementIds.includes(element.id) &&
+              !isElementLocked(element)
+          )
+          .map((element) => element.id)
+      );
+
+      if (deletableSelectedIds.size === 0) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.filter(
+            (element) => !deletableSelectedIds.has(element.id)
+          ),
+        },
         selectedId: "section-root",
+        selectedIds: [],
       };
     });
   },
@@ -463,21 +734,69 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
           elements: [...state.section.elements, duplicatedElement],
         },
         selectedId: duplicatedElement.id,
+        selectedIds: [duplicatedElement.id],
+      };
+    });
+  },
+
+  duplicateSelectedElements: () => {
+    set((state) => {
+      const selectedElementIds = getSelectedElementIds(state);
+
+      if (selectedElementIds.length === 0) {
+        return state;
+      }
+
+      const sourceElements = state.section.elements.filter((element) =>
+        selectedElementIds.includes(element.id)
+      );
+
+      if (sourceElements.length === 0) {
+        return state;
+      }
+
+      const duplicatedElements = sourceElements.map((element) =>
+        createDuplicatedElement(element, state.section)
+      );
+
+      const duplicatedElementIds = duplicatedElements.map(
+        (element) => element.id
+      );
+
+      const lastDuplicatedElement =
+        duplicatedElements[duplicatedElements.length - 1];
+
+      return {
+        section: {
+          ...state.section,
+          elements: [...state.section.elements, ...duplicatedElements],
+        },
+        selectedId: lastDuplicatedElement?.id ?? state.selectedId,
+        selectedIds: duplicatedElementIds,
       };
     });
   },
 
   moveSelectedElement: (deltaX, deltaY) => {
     set((state) => {
-      if (!state.selectedId || state.selectedId === state.section.id) {
+      const editableSelectedElements = getEditableSelectedElements(state);
+
+      if (editableSelectedElements.length === 0) {
         return state;
       }
 
-      const selectedElement = state.section.elements.find(
-        (element) => element.id === state.selectedId
+      const editableSelectedIds = new Set(
+        editableSelectedElements.map((element) => element.id)
       );
 
-      if (!selectedElement || isElementLocked(selectedElement)) {
+      const clampedDelta = getGroupClampedDelta(
+        state.section,
+        editableSelectedElements,
+        deltaX,
+        deltaY
+      );
+
+      if (clampedDelta.deltaX === 0 && clampedDelta.deltaY === 0) {
         return state;
       }
 
@@ -485,17 +804,14 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
         section: {
           ...state.section,
           elements: state.section.elements.map((element) => {
-            if (element.id !== state.selectedId) {
+            if (!editableSelectedIds.has(element.id)) {
               return element;
             }
 
-            const maxX = Math.max(0, state.section.width - element.width);
-            const maxY = Math.max(0, state.section.height - element.height);
-
             return {
               ...element,
-              x: Math.min(Math.max(0, element.x + deltaX), maxX),
-              y: Math.min(Math.max(0, element.y + deltaY), maxY),
+              x: element.x + clampedDelta.deltaX,
+              y: element.y + clampedDelta.deltaY,
             };
           }),
         },
@@ -505,15 +821,23 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
 
   alignSelectedElement: (alignment) => {
     set((state) => {
-      if (!state.selectedId || state.selectedId === state.section.id) {
+      const selectedElementIds = getSelectedElementIds(state);
+
+      if (selectedElementIds.length === 0) {
         return state;
       }
 
-      const selectedElement = state.section.elements.find(
-        (element) => element.id === state.selectedId
+      const editableSelectedIds = new Set(
+        state.section.elements
+          .filter(
+            (element) =>
+              selectedElementIds.includes(element.id) &&
+              isElementEditable(element)
+          )
+          .map((element) => element.id)
       );
 
-      if (!selectedElement || isElementLocked(selectedElement)) {
+      if (editableSelectedIds.size === 0) {
         return state;
       }
 
@@ -521,11 +845,11 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
         section: {
           ...state.section,
           elements: state.section.elements.map((element) => {
-            if (element.id !== state.selectedId) {
+            if (!editableSelectedIds.has(element.id)) {
               return element;
             }
 
-            const alignedPosition = getAlignedPosition(
+            const alignedPosition = getAlignedPositionToSection(
               state.section,
               element,
               alignment
@@ -537,6 +861,419 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
               y: alignedPosition.y,
             };
           }),
+        },
+      };
+    });
+  },
+
+  alignSelectedElementsToPrimary: (alignment) => {
+    set((state) => {
+      if (!state.selectedId || state.selectedIds.length < 2) {
+        return state;
+      }
+
+      const primaryElement = state.section.elements.find(
+        (element) => element.id === state.selectedId
+      );
+
+      if (!primaryElement || !isElementVisible(primaryElement)) {
+        return state;
+      }
+
+      const editableTargetIds = new Set(
+        state.section.elements
+          .filter(
+            (element) =>
+              element.id !== primaryElement.id &&
+              state.selectedIds.includes(element.id) &&
+              isElementEditable(element)
+          )
+          .map((element) => element.id)
+      );
+
+      if (editableTargetIds.size === 0) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.map((element) => {
+            if (!editableTargetIds.has(element.id)) {
+              return element;
+            }
+
+            const alignedPosition = getAlignedPositionToPrimary(
+              state.section,
+              element,
+              primaryElement,
+              alignment
+            );
+
+            return {
+              ...element,
+              x: alignedPosition.x,
+              y: alignedPosition.y,
+            };
+          }),
+        },
+      };
+    });
+  },
+
+  distributeSelectedElementsHorizontally: () => {
+    set((state) => {
+      const editableSelectedElements = getEditableSelectedElements(state);
+
+      if (editableSelectedElements.length < 2) {
+        return state;
+      }
+
+      const sortedElements = [...editableSelectedElements].sort((a, b) => {
+        if (a.x === b.x) {
+          return a.y - b.y;
+        }
+
+        return a.x - b.x;
+      });
+
+      const totalWidth = sortedElements.reduce(
+        (sum, element) => sum + element.width,
+        0
+      );
+
+      const availableSpace = state.section.width - totalWidth;
+
+      if (availableSpace < 0) {
+        return state;
+      }
+
+      const gap = availableSpace / (sortedElements.length + 1);
+      let nextX = gap;
+      const nextXByElementId = new Map<string, number>();
+
+      sortedElements.forEach((element) => {
+        nextXByElementId.set(
+          element.id,
+          clampElementX(state.section, element, Math.round(nextX))
+        );
+
+        nextX += element.width + gap;
+      });
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.map((element) => {
+            const nextElementX = nextXByElementId.get(element.id);
+
+            if (nextElementX === undefined) {
+              return element;
+            }
+
+            return {
+              ...element,
+              x: nextElementX,
+            };
+          }),
+        },
+      };
+    });
+  },
+
+  distributeSelectedElementsVertically: () => {
+    set((state) => {
+      const editableSelectedElements = getEditableSelectedElements(state);
+
+      if (editableSelectedElements.length < 2) {
+        return state;
+      }
+
+      const sortedElements = [...editableSelectedElements].sort((a, b) => {
+        if (a.y === b.y) {
+          return a.x - b.x;
+        }
+
+        return a.y - b.y;
+      });
+
+      const totalHeight = sortedElements.reduce(
+        (sum, element) => sum + element.height,
+        0
+      );
+
+      const availableSpace = state.section.height - totalHeight;
+
+      if (availableSpace < 0) {
+        return state;
+      }
+
+      const gap = availableSpace / (sortedElements.length + 1);
+      let nextY = gap;
+      const nextYByElementId = new Map<string, number>();
+
+      sortedElements.forEach((element) => {
+        nextYByElementId.set(
+          element.id,
+          clampElementY(state.section, element, Math.round(nextY))
+        );
+
+        nextY += element.height + gap;
+      });
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.map((element) => {
+            const nextElementY = nextYByElementId.get(element.id);
+
+            if (nextElementY === undefined) {
+              return element;
+            }
+
+            return {
+              ...element,
+              y: nextElementY,
+            };
+          }),
+        },
+      };
+    });
+  },
+
+  matchSelectedElementsWidthToPrimary: () => {
+    set((state) => {
+      if (!state.selectedId || state.selectedIds.length < 2) {
+        return state;
+      }
+
+      const primaryElement = state.section.elements.find(
+        (element) => element.id === state.selectedId
+      );
+
+      if (!primaryElement || !isElementVisible(primaryElement)) {
+        return state;
+      }
+
+      const editableTargetIds = new Set(
+        state.section.elements
+          .filter(
+            (element) =>
+              element.id !== primaryElement.id &&
+              state.selectedIds.includes(element.id) &&
+              isElementEditable(element)
+          )
+          .map((element) => element.id)
+      );
+
+      if (editableTargetIds.size === 0) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.map((element) => {
+            if (!editableTargetIds.has(element.id)) {
+              return element;
+            }
+
+            return {
+              ...element,
+              width: clampElementWidth(
+                state.section,
+                element,
+                primaryElement.width
+              ),
+            };
+          }),
+        },
+      };
+    });
+  },
+
+  matchSelectedElementsHeightToPrimary: () => {
+    set((state) => {
+      if (!state.selectedId || state.selectedIds.length < 2) {
+        return state;
+      }
+
+      const primaryElement = state.section.elements.find(
+        (element) => element.id === state.selectedId
+      );
+
+      if (!primaryElement || !isElementVisible(primaryElement)) {
+        return state;
+      }
+
+      const editableTargetIds = new Set(
+        state.section.elements
+          .filter(
+            (element) =>
+              element.id !== primaryElement.id &&
+              state.selectedIds.includes(element.id) &&
+              isElementEditable(element)
+          )
+          .map((element) => element.id)
+      );
+
+      if (editableTargetIds.size === 0) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.map((element) => {
+            if (!editableTargetIds.has(element.id)) {
+              return element;
+            }
+
+            return {
+              ...element,
+              height: clampElementHeight(
+                state.section,
+                element,
+                primaryElement.height
+              ),
+            };
+          }),
+        },
+      };
+    });
+  },
+
+  hideSelectedElements: () => {
+    set((state) => {
+      const selectedElements = getSelectedElements(state);
+
+      if (selectedElements.length === 0) {
+        return state;
+      }
+
+      const targetIds = new Set(
+        selectedElements
+          .filter((element) => isElementVisible(element))
+          .map((element) => element.id)
+      );
+
+      if (targetIds.size === 0) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.map((element) =>
+            targetIds.has(element.id)
+              ? {
+                  ...element,
+                  isVisible: false,
+                }
+              : element
+          ),
+        },
+      };
+    });
+  },
+
+  showSelectedElements: () => {
+    set((state) => {
+      const selectedElements = getSelectedElements(state);
+
+      if (selectedElements.length === 0) {
+        return state;
+      }
+
+      const targetIds = new Set(
+        selectedElements
+          .filter((element) => !isElementVisible(element))
+          .map((element) => element.id)
+      );
+
+      if (targetIds.size === 0) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.map((element) =>
+            targetIds.has(element.id)
+              ? {
+                  ...element,
+                  isVisible: true,
+                }
+              : element
+          ),
+        },
+      };
+    });
+  },
+
+  lockSelectedElements: () => {
+    set((state) => {
+      const selectedElements = getSelectedElements(state);
+
+      if (selectedElements.length === 0) {
+        return state;
+      }
+
+      const targetIds = new Set(
+        selectedElements
+          .filter((element) => !isElementLocked(element))
+          .map((element) => element.id)
+      );
+
+      if (targetIds.size === 0) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.map((element) =>
+            targetIds.has(element.id)
+              ? {
+                  ...element,
+                  isLocked: true,
+                }
+              : element
+          ),
+        },
+      };
+    });
+  },
+
+  unlockSelectedElements: () => {
+    set((state) => {
+      const selectedElements = getSelectedElements(state);
+
+      if (selectedElements.length === 0) {
+        return state;
+      }
+
+      const targetIds = new Set(
+        selectedElements
+          .filter((element) => isElementLocked(element))
+          .map((element) => element.id)
+      );
+
+      if (targetIds.size === 0) {
+        return state;
+      }
+
+      return {
+        section: {
+          ...state.section,
+          elements: state.section.elements.map((element) =>
+            targetIds.has(element.id)
+              ? {
+                  ...element,
+                  isLocked: false,
+                }
+              : element
+          ),
         },
       };
     });
@@ -675,6 +1412,7 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
           ),
         },
         selectedId: elementId,
+        selectedIds: [elementId],
       };
     });
   },
@@ -699,6 +1437,7 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
           ),
         },
         selectedId: elementId,
+        selectedIds: [elementId],
       };
     });
   },
@@ -717,6 +1456,7 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
         ),
       },
       selectedId: elementId,
+      selectedIds: [elementId],
     }));
   },
 
@@ -734,6 +1474,7 @@ export const useSectionEditorStore = create<SectionEditorState>((set) => ({
         ),
       },
       selectedId: elementId,
+      selectedIds: [elementId],
     }));
   },
 
